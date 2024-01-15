@@ -1,0 +1,45 @@
+name: Daily Login
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 22,10 * * *"
+
+jobs:
+  daily:
+    runs-on: ubuntu-latest
+    env:
+      data_folder: "data/"
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Checkout data repo
+        uses: actions/checkout@v3
+        with:
+          repository: chaldea-center/daily-login-data
+          token: ${{ secrets.GH_PAGES_TOKEN }}
+          path: ${{ env.data_folder }}
+
+      - name: Save config.json
+        run: echo "${{ secrets.CONFIG_DATA }}" | base64 -d > config.json
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Login
+        run: python main.py
+
+      - name: Commit and publish
+        working-directory: ${{ env.data_folder }}
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .
+          git --no-pager diff --stat --staged
+          git commit -m "$(/bin/date -u "+%Y%m%d_%H%M")" || echo "Nothing to commit"
+          git push

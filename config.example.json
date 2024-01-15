@@ -1,0 +1,13 @@
+{
+  "users": [
+    {
+      "name": "account1",
+      "enabled": true,
+      "region": "JP",
+      "secret": "ZSv/xxxxx==",
+      "userAgent": "Dalvik/2.1.0 (Linux; U; Android 13; M2012K11AC Build/TKQ1.220829.002)",
+      "deviceInfo": "Xiaomi M2012K11AC / Android OS 13 / API-33 (TKQ1.220829.002/V14.0.7.0.TKHCNXM)",
+      "country": null
+    }
+  ]
+}
