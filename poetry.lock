@@ -181,7 +181,7 @@ requests = "^2.31.0"
 type = "git"
 url = "https://github.com/chaldea-center/fgoapi.git"
 reference = "main"
-resolved_reference = "06c1bcd28acaec9a67dfdb5508ef96c710dc6af0"
+resolved_reference = "28c25c91ed21d0a485818705d0f70dc363ec69b7"
 
 [[package]]
 name = "furl"

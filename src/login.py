@@ -4,7 +4,7 @@ from datetime import datetime
 from pathlib import Path
 
 import httpx
-from fgoapi.agent import FgoAgent
+from fgoapi.fgoapi import FgoApi
 from fgoapi.schemas.common import AuthSaveData, Region, UserData
 
 from .schemas.config import UserConfig
@@ -21,7 +21,7 @@ async def start_login(user_config: UserConfig, data_folder: Path, max_retry: int
         country=user_config.country,
     )
     file_saver = FileSaver(data_folder, user_config.region, auth.userId)
-    agent = FgoAgent(user)
+    agent = FgoApi(user)
     count = 0
     while count < max_retry:
         try:
