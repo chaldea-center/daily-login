@@ -2,8 +2,10 @@ from asyncio import sleep
 from pathlib import Path
 
 import httpx
+
 from fgoapi.fgoapi import FgoApi
 from fgoapi.schemas.common import AuthSaveData, Region, UserData
+from fgoapi.schemas.entities import UserLoginEntity
 
 from .schemas.config import UserConfig
 from .utils import dump_json, load_json
@@ -27,22 +29,22 @@ async def start_login(
         try:
             await agent.gamedata_top()
             toplogin = await agent.login_top()
-            await agent.home_top()
             assert toplogin.data
-            toplogin.raw_resp.text
             file_saver.save_nid("login_top", toplogin.raw_resp.json())
 
             save_presents(
-                toplogin.data.cache["replaced"]["userPresentBox"],
+                toplogin.data.cache.get("userPresentBox"),
                 file_saver.stats / "userPresentBox.json",
             )
 
-            userLogin = toplogin.data.cache["updated"]["userLogin"][0]
-            seqLoginCount = userLogin["seqLoginCount"]
-            totalLoginCount = userLogin["totalLoginCount"]
-            return f"Seq:{seqLoginCount} Total:{totalLoginCount}"
+            userLogin = toplogin.data.cache.get_model("userLogin", UserLoginEntity)[0]
+
+            await agent.home_top()
+
+            return f"Seq:{userLogin.seqLoginCount} Total:{userLogin.totalLoginCount}"
         except httpx.HTTPError as e:
             count += 1
+            print("http error", e)
             await sleep(5)
             continue
     raise Exception(f"Failed after max {max_retry} retries")

@@ -1,5 +1,6 @@
-from fgoapi.schemas.common import NACountry, Region
 from pydantic import BaseModel
+
+from fgoapi.schemas.common import NACountry, Region
 
 
 class UserConfig(BaseModel):

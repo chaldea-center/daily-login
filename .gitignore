@@ -6,6 +6,7 @@
 /data
 /logs
 /commit-msg.txt
+/fgoapi
 
 ### Python template
 # Byte-compiled / optimized / DLL files

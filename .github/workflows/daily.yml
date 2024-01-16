@@ -22,6 +22,12 @@ jobs:
       - name: Save config.json
         run: echo "${{ secrets.CONFIG_DATA }}" | base64 -d > config.json
 
+      - uses: actions/checkout@v3
+        with:
+          repository: chaldea-center/fgoapi
+          path: fgoapi-repo
+      - run: mv fgoapi-repo/fgoapi fgoapi && rm -rf fgoapi-repo
+
       - name: Setup Python 3.11
         uses: actions/setup-python@v4
         with:
@@ -29,7 +35,7 @@ jobs:
           cache: "pip"
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: sed -i '/^fgoapi/d' requirements.txt && pip install -r requirements.txt
 
       - name: Login
         run: python main.py
