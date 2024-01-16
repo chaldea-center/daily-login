@@ -30,7 +30,7 @@ async def start_login(
             await agent.gamedata_top()
             toplogin = await agent.login_top()
             assert toplogin.data
-            file_saver.save_nid("login_top", toplogin.raw_resp.json())
+            save_toplogin(toplogin.raw_resp.json(), file_saver.nid_fp("login_top"))
 
             save_presents(
                 toplogin.data.cache.get("userPresentBox"),
@@ -70,12 +70,45 @@ def save_presents(new_presents: list[dict], fp: Path):
     dump_json(presents, fp, indent=True)
 
 
+def save_toplogin(new_toplogin: dict, fp: Path):
+    from copy import deepcopy
+
+    def get_dump(data: dict, idx: int):
+        data = deepcopy(data["cache"])
+        if "serverTime" in data:
+            data["serverTime"] = 0
+
+        def replace_value(mst: str, key: str, value):
+            for changed in ["updated", "replaced"]:
+                if mst in data[changed]:
+                    items = data[changed][mst]
+                    for item in items:
+                        if key in item:
+                            item[key] = value
+
+        replace_value("userLogin", "lastLoginAt", 0)
+        replace_value("userSvtLeader", "updatedAt", 0)
+        replace_value("userEvent", "updatedAt", 0)
+        replace_value("userEvent", "createdAt", 0)
+        return dump_json(data, f"{idx}.json")
+
+    if fp.exists():
+        prev_toplogin = load_json(fp)
+        if get_dump(prev_toplogin, 1) == get_dump(new_toplogin, 2):
+            print("toplogin cache almost same, skip saving")
+            return
+    dump_json(new_toplogin, fp, indent=True)
+
+
 class FileSaver:
     def __init__(self, data_folder: str | Path, region: Region, user_id: str) -> None:
         self.root = Path(data_folder).resolve() / f"{region}_{user_id}"
         self.stats = self.root / "_stats"
 
+    def nid_fp(self, nid: str):
+        return self.root / nid / f"{nid}.json"
+
     def save_nid(self, nid: str, data: dict):
-        fp = self.root / nid / f"{nid}.json"
+        fp = self.nid_fp(nid)
         fp.parent.mkdir(parents=True, exist_ok=True)
         dump_json(data, fp, indent=True)

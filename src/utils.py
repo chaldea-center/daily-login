@@ -11,7 +11,7 @@ def load_json(fp: str | Path, _default=None) -> Any:
     return _default
 
 
-def dump_json(obj, fp: str | Path | None = None, indent=False, default=None):
+def dump_json(obj, fp: str | Path | None = None, indent=False, default=None) -> str:
     option = orjson.OPT_NON_STR_KEYS
     if indent:
         option |= orjson.OPT_INDENT_2 | orjson.OPT_APPEND_NEWLINE
@@ -20,4 +20,4 @@ def dump_json(obj, fp: str | Path | None = None, indent=False, default=None):
         fp = Path(fp).resolve()
         fp.parent.mkdir(parents=True, exist_ok=True)
         fp.write_bytes(result)
-    return result
+    return result.decode()
