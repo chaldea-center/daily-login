@@ -39,7 +39,14 @@ jobs:
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
           git add .
           git --no-pager diff --stat --staged
-          git commit -m "$(/bin/date -u "+%Y%m%d_%H%M")" || echo "Nothing to commit"
+
+          if [ -e $GITHUB_WORKSPACE/commit-msg.txt ]
+          then
+              git commit -F $GITHUB_WORKSPACE/commit-msg.txt || echo "Nothing to commit"
+          else
+              git commit -m "$(/bin/date -u "+%Y-%m-%d %H:%M")" || echo "Nothing to commit"
+          fi
           git push

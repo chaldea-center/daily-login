@@ -1,6 +1,4 @@
-import gzip
 from asyncio import sleep
-from datetime import datetime
 from pathlib import Path
 
 import httpx
@@ -11,7 +9,9 @@ from .schemas.config import UserConfig
 from .utils import dump_json, load_json
 
 
-async def start_login(user_config: UserConfig, data_folder: Path, max_retry: int = 3):
+async def start_login(
+    user_config: UserConfig, data_folder: Path, max_retry: int = 3
+) -> str:
     auth = AuthSaveData.parse_secret(user_config.secret)
     user = UserData(
         region=user_config.region,
@@ -30,13 +30,17 @@ async def start_login(user_config: UserConfig, data_folder: Path, max_retry: int
             await agent.home_top()
             assert toplogin.data
             toplogin.raw_resp.text
-            file_saver.save_nid("login_top", toplogin.raw_resp.text)
+            file_saver.save_nid("login_top", toplogin.raw_resp.json())
 
             save_presents(
                 toplogin.data.cache["replaced"]["userPresentBox"],
                 file_saver.stats / "userPresentBox.json",
             )
-            return
+
+            userLogin = toplogin.data.cache["updated"]["userLogin"][0]
+            seqLoginCount = userLogin["seqLoginCount"]
+            totalLoginCount = userLogin["totalLoginCount"]
+            return f"Seq:{seqLoginCount} Total:{totalLoginCount}"
         except httpx.HTTPError as e:
             count += 1
             await sleep(5)
@@ -69,10 +73,7 @@ class FileSaver:
         self.root = Path(data_folder).resolve() / f"{region}_{user_id}"
         self.stats = self.root / "_stats"
 
-    def save_nid(self, nid: str, text: str):
-        t = datetime.now().isoformat().rsplit(".", maxsplit=1)[0]
-        t = t.replace(":", "-").replace("T", "_")
-        fp = self.root / nid / f"{nid}_{t}.bin"
+    def save_nid(self, nid: str, data: dict):
+        fp = self.root / nid / f"{nid}.json"
         fp.parent.mkdir(parents=True, exist_ok=True)
-        compressed = gzip.compress(text.encode())
-        fp.write_bytes(compressed)
+        dump_json(data, fp, indent=True)

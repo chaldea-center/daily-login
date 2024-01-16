@@ -5,6 +5,7 @@
 /test*.py
 /data
 /logs
+/commit-msg.txt
 
 ### Python template
 # Byte-compiled / optimized / DLL files
