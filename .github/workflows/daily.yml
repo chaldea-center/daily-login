@@ -2,7 +2,8 @@ name: Daily Login
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 22,10 * * *"
+    # JST 10,22
+    - cron: "0 1,13 * * *"
 
 jobs:
   daily:
@@ -22,7 +23,8 @@ jobs:
       - name: Save config.json
         run: echo "${{ secrets.CONFIG_DATA }}" | base64 -d > config.json
 
-      - uses: actions/checkout@v3
+      - name: Checkout fgoapi
+        uses: actions/checkout@v3
         with:
           repository: chaldea-center/fgoapi
           path: fgoapi-repo

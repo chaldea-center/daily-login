@@ -1,5 +1,6 @@
 from asyncio import sleep
 from pathlib import Path
+from typing import cast
 
 import httpx
 
@@ -70,31 +71,57 @@ def save_presents(new_presents: list[dict], fp: Path):
     dump_json(presents, fp, indent=True)
 
 
+def replace_cache_value(cache: dict, mst: str, key: str, value):
+    for changed in ["updated", "deleted", "replaced"]:
+        if mst in cache[changed]:
+            items = cache[changed][mst]
+            for item in items:
+                if key in item:
+                    item[key] = value
+
+
+def replace_response_detail(resp: dict, key: str, value, delete=False):
+    details: list[dict] = resp.get("response", [])
+    if not details:
+        return
+    for detail in details:
+        success: dict = cast(dict, detail).get("success", {})
+        if not success:
+            continue
+        if key in success:
+            if delete:
+                success.pop(key)
+            else:
+                success[key] = value
+
+
 def save_toplogin(new_toplogin: dict, fp: Path):
     from copy import deepcopy
 
-    def get_dump(data: dict, idx: int):
-        data = deepcopy(data["cache"])
-        if "serverTime" in data:
-            data["serverTime"] = 0
+    new_toplogin = deepcopy(new_toplogin)
+    new_cache = new_toplogin["cache"]
 
-        def replace_value(mst: str, key: str, value):
-            for changed in ["updated", "replaced"]:
-                if mst in data[changed]:
-                    items = data[changed][mst]
-                    for item in items:
-                        if key in item:
-                            item[key] = value
+    # replace_response_detail(new_toplogin, "obfuscatedAccountId", None, delete=True)
+    replace_response_detail(new_toplogin, "addFriendPoint", None, delete=True)
+    replace_response_detail(new_toplogin, "addFollowFriendPoint", None, delete=True)
+    replace_response_detail(new_toplogin, "topAddFriendPointSvt", None, delete=True)
+    replace_response_detail(new_toplogin, "topAddFriendPointSvtEQ", None, delete=True)
 
-        replace_value("userLogin", "lastLoginAt", 0)
-        replace_value("userSvtLeader", "updatedAt", 0)
-        replace_value("userEvent", "updatedAt", 0)
-        replace_value("userEvent", "createdAt", 0)
-        return dump_json(data, f"{idx}.json")
+    replace_cache_value(new_cache, "userSvtLeader", "updatedAt", 0)
+    replace_cache_value(new_cache, "userEvent", "updatedAt", 0)
+    replace_cache_value(new_cache, "userEvent", "createdAt", 0)
+
+    def get_dump(data: dict):
+        cache = deepcopy(data["cache"])
+        if "serverTime" in cache:
+            cache["serverTime"] = 0
+
+        replace_cache_value(cache, "userLogin", "lastLoginAt", 0)
+        return dump_json(cache)
 
     if fp.exists():
         prev_toplogin = load_json(fp)
-        if get_dump(prev_toplogin, 1) == get_dump(new_toplogin, 2):
+        if get_dump(prev_toplogin) == get_dump(new_toplogin):
             print("toplogin cache almost same, skip saving")
             return
     dump_json(new_toplogin, fp, indent=True)
