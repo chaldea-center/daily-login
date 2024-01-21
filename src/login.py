@@ -42,7 +42,7 @@ async def start_login(
 
             await agent.home_top()
 
-            return f"Seq:{userLogin.seqLoginCount} Total:{userLogin.totalLoginCount}"
+            return f"{userLogin.seqLoginCount}/{userLogin.totalLoginCount}"
         except httpx.HTTPError as e:
             count += 1
             print("http error", e)
