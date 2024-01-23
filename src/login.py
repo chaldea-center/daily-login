@@ -112,12 +112,13 @@ def save_toplogin(new_toplogin: dict, fp: Path):
     replace_cache_value(new_cache, "userEvent", "createdAt", 0)
 
     def get_dump(data: dict):
-        cache = deepcopy(data["cache"])
+        data = deepcopy(data)
+        cache = data["cache"]
         if "serverTime" in cache:
             cache["serverTime"] = 0
 
         replace_cache_value(cache, "userLogin", "lastLoginAt", 0)
-        return dump_json(cache)
+        return dump_json(data)
 
     if fp.exists():
         prev_toplogin = load_json(fp)
