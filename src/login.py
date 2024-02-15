@@ -7,6 +7,7 @@ import httpx
 from fgoapi.fgoapi import FgoApi
 from fgoapi.schemas.common import AuthSaveData, Region, UserData
 from fgoapi.schemas.entities import UserLoginEntity
+from fgoapi.schemas.response import FResponseData
 
 from .schemas.config import UserConfig
 from .utils import dump_json, load_json
@@ -31,18 +32,9 @@ async def start_login(
             await agent.gamedata_top()
             toplogin = await agent.login_top()
             assert toplogin.data
-            save_toplogin(toplogin.raw_resp.json(), file_saver.nid_fp("login_top"))
-
-            save_presents(
-                toplogin.data.cache.get("userPresentBox"),
-                file_saver.stats / "userPresentBox.json",
-            )
-
-            userLogin = toplogin.data.cache.get_model("userLogin", UserLoginEntity)[0]
-
+            seq_login_msg = post_process(toplogin.raw_resp.json(),file_saver)
             await agent.home_top()
-
-            return f"{userLogin.seqLoginCount}/{userLogin.totalLoginCount}"
+            return seq_login_msg
         except httpx.HTTPError as e:
             count += 1
             print("http error", e)
@@ -50,6 +42,20 @@ async def start_login(
             continue
     raise Exception(f"Failed after max {max_retry} retries")
 
+
+def post_process(src_data: dict, file_saver: "FileSaver")->str:
+    save_toplogin(src_data, file_saver.nid_fp("login_top"))
+    data = FResponseData.model_validate(src_data)
+
+    save_presents(
+        data.cache.get("userPresentBox"),
+        file_saver.stats / "userPresentBox.json",
+    )
+
+    userLogin = data.cache.get_model("userLogin", UserLoginEntity)[0]
+
+
+    return f"{userLogin.seqLoginCount}/{userLogin.totalLoginCount}"
 
 def save_presents(new_presents: list[dict], fp: Path):
     key = "presentId"
