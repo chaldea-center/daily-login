@@ -1,0 +1,1 @@
+js-beautify -r -s=2 -n "data/**/**.json"

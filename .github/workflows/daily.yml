@@ -38,10 +38,15 @@ jobs:
           cache: "pip"
 
       - name: Install dependencies
-        run: sed -i '/^fgoapi/d' requirements.txt && pip install -r requirements.txt
+        run: |
+          sed -i '/^fgoapi/d' requirements.txt && pip install -r requirements.txt
+          npm --location=global install js-beautify          
 
       - name: Login
         run: python main.py
+
+      - name: Format
+        run: sh scripts/format_data.sh
 
       - name: Commit and publish
         working-directory: ${{ env.data_folder }}

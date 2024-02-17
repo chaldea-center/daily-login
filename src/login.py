@@ -11,6 +11,11 @@ from fgoapi.schemas.response import FResponseData
 
 from .schemas.config import UserConfig
 from .utils import dump_json, load_json
+from .logger import logger
+from .schemas.data import AccountStatData
+
+CampaignBonusData_ = dict
+UserPresentBoxEntity_ = dict
 
 
 async def start_login(
@@ -32,49 +37,90 @@ async def start_login(
             await agent.gamedata_top()
             toplogin = await agent.login_top()
             assert toplogin.data
-            seq_login_msg = post_process(toplogin.raw_resp.json(),file_saver)
+            seq_login_msg = post_process(toplogin.raw_resp.json(), file_saver)
             await agent.home_top()
             return seq_login_msg
         except httpx.HTTPError as e:
             count += 1
-            print("http error", e)
+            logger.exception("http error")
             await sleep(5)
             continue
     raise Exception(f"Failed after max {max_retry} retries")
 
 
-def post_process(src_data: dict, file_saver: "FileSaver")->str:
+def post_process(src_data: dict, file_saver: "FileSaver") -> str:
     save_toplogin(src_data, file_saver.nid_fp("login_top"))
-    data = FResponseData.model_validate(src_data)
+    try:
+        resp = FResponseData.model_validate(src_data)
+        logger.info(src_data.get("response") or "no response found")
 
-    save_presents(
-        data.cache.get("userPresentBox"),
-        file_saver.stats / "userPresentBox.json",
-    )
+        stat_fp = Path(file_saver.stat_data())
+        stat_data = AccountStatData.model_validate_json(stat_fp.read_bytes())
 
-    userLogin = data.cache.get_model("userLogin", UserLoginEntity)[0]
+        stat_data.userPresentBox = save_presents(stat_data.userPresentBox, resp)
+        stat_data.campaignbonus = save_campaignbonus(stat_data.campaignbonus, resp)
+
+        dump_json(stat_data.model_dump(), stat_fp, indent=False)
+
+        userLogin = resp.cache.get_model("userLogin", UserLoginEntity)[0]
+        return f"{userLogin.seqLoginCount}/{userLogin.totalLoginCount}"
+    except Exception:
+        logger.exception("post process failed")
+        return "failed"
 
 
-    return f"{userLogin.seqLoginCount}/{userLogin.totalLoginCount}"
-
-def save_presents(new_presents: list[dict], fp: Path):
+def save_presents(
+    all_presents: list[UserPresentBoxEntity_], resp: FResponseData
+) -> list[UserPresentBoxEntity_]:
     key = "presentId"
-    if fp.exists():
-        present_dict: dict[int, dict] = {
-            present[key]: present for present in load_json(fp)
-        }
-    else:
-        present_dict = {}
+    present_dict: dict[int, UserPresentBoxEntity_] = {
+        present[key]: present for present in all_presents
+    }
     before_count = len(present_dict)
-    for present in new_presents:
+
+    cur_presents = resp.cache.get("userPresentBox")
+    for present in cur_presents:
         present_dict[present[key]] = present
     presents = list(present_dict.values())
     presents.sort(key=lambda x: x[key])
     after_count = len(present_dict)
-    print(
-        f"Inserted {len(new_presents)} presents, total {after_count} presents ({after_count-before_count} added)"
+    logger.info(
+        f"Inserted {len(cur_presents)} presents, total {after_count} presents ({after_count-before_count} added)"
     )
-    dump_json(presents, fp, indent=True)
+    return presents
+
+
+def save_campaignbonus(
+    all_campaigns: list[CampaignBonusData_], resp: FResponseData
+) -> list[CampaignBonusData_]:
+    def get_campaign_key(campaign: CampaignBonusData_):
+        return f"{campaign['eventId']}_{campaign['day']}_{campaign['name']}"
+
+    login_result = resp.get_response("login")
+    if not login_result:
+        logger.warning("no login result found")
+        return all_campaigns
+    cur_campaigns: list[CampaignBonusData_] = (
+        login_result.success.get("campaignbonus") or []
+    )
+
+    if not cur_campaigns:
+        logger.info("no new campaign bonus")
+        return all_campaigns
+    campaign_dict: dict[str, CampaignBonusData_] = {
+        get_campaign_key(campaign): campaign for campaign in all_campaigns
+    }
+    before_count = len(campaign_dict)
+    for campaign in cur_campaigns or []:
+        campaign["updatedAt"] = resp.cache.serverTime
+        campaign_dict[get_campaign_key(campaign)] = campaign
+    campaigns = list(campaign_dict.values())
+    campaigns.sort(key=lambda x: (x.get("updatedAt", 0), x["eventId"], x["day"]))
+    after_count = len(campaign_dict)
+    logger.info(
+        f"Inserted {len(cur_campaigns)} campaigns, total {after_count} presents ({after_count-before_count} added)"
+    )
+    return campaigns
 
 
 def replace_cache_value(cache: dict, mst: str, key: str, value):
@@ -129,9 +175,9 @@ def save_toplogin(new_toplogin: dict, fp: Path):
     if fp.exists():
         prev_toplogin = load_json(fp)
         if get_dump(prev_toplogin) == get_dump(new_toplogin):
-            print("toplogin cache almost same, skip saving")
+            logger.info("toplogin cache almost same, skip saving")
             return
-    dump_json(new_toplogin, fp, indent=True)
+    dump_json(new_toplogin, fp, indent=False)
 
 
 class FileSaver:
@@ -145,4 +191,7 @@ class FileSaver:
     def save_nid(self, nid: str, data: dict):
         fp = self.nid_fp(nid)
         fp.parent.mkdir(parents=True, exist_ok=True)
-        dump_json(data, fp, indent=True)
+        dump_json(data, fp, indent=False)
+
+    def stat_data(self):
+        return self.stats / "data.json"
