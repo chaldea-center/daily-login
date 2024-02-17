@@ -4,11 +4,10 @@ import os
 from pathlib import Path
 
 from src.login import start_login
-from src.schemas.config import Config
+from src.schemas.config import config
 
 
 async def main():
-    config = Config.model_validate_json(Path("config.json").read_bytes())
     if not config.users:
         print("No user")
         return

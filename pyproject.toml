@@ -9,6 +9,17 @@ readme = "README.md"
 python = "^3.11"
 fgoapi = {git = "https://github.com/chaldea-center/fgoapi.git", rev = "main"}
 
+[tool.poetry.group.dev.dependencies]
+black = "^24.2.0"
+
+[tool.isort]
+line_length = 88
+known_third_party = "orjson"
+multi_line_output = 3
+force_grid_wrap = 0
+lines_after_imports = 2
+combine_as_imports = true
+include_trailing_comma = true
 
 [build-system]
 requires = ["poetry-core"]

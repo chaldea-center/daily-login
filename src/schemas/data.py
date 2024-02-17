@@ -1,7 +1,8 @@
-from typing import Any, Mapping
+from typing import Any
+
+from typing_extensions import TypedDict
 
 from fgoapi.schemas.common import BaseModelExtra, Region
-from typing_extensions import TypedDict
 
 
 class AccountInfo(BaseModelExtra):

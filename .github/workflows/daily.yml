@@ -44,6 +44,8 @@ jobs:
 
       - name: Login
         run: python main.py
+        env:
+          discord_webhook: ${{ secrets.DISCORD_WEBHOOK }}
 
       - name: Format
         run: sh scripts/format_data.sh

@@ -9,10 +9,11 @@ from fgoapi.schemas.common import AuthSaveData, Region, UserData
 from fgoapi.schemas.entities import UserLoginEntity
 from fgoapi.schemas.response import FResponseData
 
-from .schemas.config import UserConfig
-from .utils import dump_json, load_json
 from .logger import logger
+from .schemas.config import UserConfig
 from .schemas.data import AccountStatData
+from .utils import dump_json, load_json, send_discord_msg
+
 
 CampaignBonusData_ = dict
 UserPresentBoxEntity_ = dict
@@ -64,8 +65,9 @@ def post_process(src_data: dict, file_saver: "FileSaver") -> str:
 
         userLogin = resp.cache.get_model("userLogin", UserLoginEntity)[0]
         return f"{userLogin.seqLoginCount}/{userLogin.totalLoginCount}"
-    except Exception:
+    except Exception as e:
         logger.exception("post process failed")
+        send_discord_msg(f"post process failed: {e}")
         return "failed"
 
 
@@ -100,8 +102,8 @@ def save_campaignbonus(
     if not login_result:
         logger.warning("no login result found")
         return all_campaigns
-    cur_campaigns: list[CampaignBonusData_] = (
-        login_result.success.get("campaignbonus") or []
+    cur_campaigns: list[CampaignBonusData_] = login_result.success.get(
+        "campaignbonus", []
     )
 
     if not cur_campaigns:

@@ -1,10 +1,8 @@
 import logging
 import sys
-from pathlib import Path
 
 
-
-logger = logging.getLogger("chaldea-parser")
+logger = logging.getLogger("daily-login")
 _formatter = logging.Formatter(
     fmt="{asctime} [{filename}:{lineno:>3d}] {levelname:<5s}: {message}",
     datefmt="%H:%M:%S",
