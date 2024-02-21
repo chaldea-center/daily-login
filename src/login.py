@@ -1,6 +1,6 @@
 from asyncio import sleep
 from pathlib import Path
-from typing import cast
+from typing import Callable, cast
 
 import httpx
 
@@ -11,7 +11,7 @@ from fgoapi.schemas.response import FResponseData
 
 from .logger import logger
 from .schemas.config import UserConfig
-from .schemas.data import AccountStatData
+from .schemas.data import AccountStatData, LoginResultData
 from .utils import dump_json, load_json, send_discord_msg
 
 
@@ -44,7 +44,7 @@ async def start_login(
         except httpx.HTTPError as e:
             count += 1
             logger.exception("http error")
-            await sleep(5)
+            await sleep(60)
             continue
     raise Exception(f"Failed after max {max_retry} retries")
 
@@ -58,8 +58,8 @@ def post_process(src_data: dict, file_saver: "FileSaver") -> str:
         stat_fp = Path(file_saver.stat_data())
         stat_data = AccountStatData.model_validate_json(stat_fp.read_bytes())
 
-        stat_data.userPresentBox = save_presents(stat_data.userPresentBox, resp)
-        stat_data.campaignbonus = save_campaignbonus(stat_data.campaignbonus, resp)
+        save_user_entity(stat_data, resp)
+        save_login_result(stat_data.loginResult, resp)
 
         dump_json(stat_data.model_dump(), stat_fp, indent=False)
 
@@ -71,58 +71,85 @@ def post_process(src_data: dict, file_saver: "FileSaver") -> str:
         return "failed"
 
 
-def save_presents(
-    all_presents: list[UserPresentBoxEntity_], resp: FResponseData
-) -> list[UserPresentBoxEntity_]:
-    key = "presentId"
-    present_dict: dict[int, UserPresentBoxEntity_] = {
-        present[key]: present for present in all_presents
-    }
-    before_count = len(present_dict)
+def save_user_entity(account_data: AccountStatData, resp: FResponseData) -> None:
+    fields: list[
+        tuple[list[dict], str, Callable[[dict], str | int], Callable[[dict], str | int]]
+    ] = [
+        (
+            account_data.userPresentBox,
+            "userPresentBox",
+            lambda x: x["presentId"],
+            lambda x: x["presentId"],
+        ),
+    ]
 
-    cur_presents = resp.cache.get("userPresentBox")
-    for present in cur_presents:
-        present_dict[present[key]] = present
-    presents = list(present_dict.values())
-    presents.sort(key=lambda x: x[key])
-    after_count = len(present_dict)
-    logger.info(
-        f"Inserted {len(cur_presents)} presents, total {after_count} presents ({after_count-before_count} added)"
-    )
-    return presents
+    for item_list, key_name, key_getter, sort_key in fields:
+        new_items: list[dict] = resp.cache.get(key_name)
+        item_map = {key_getter(x): x for x in item_list}
+        for item in new_items:
+            item_map[key_getter(item)] = dict(item)
+        all_items = [item_map[key] for key in sorted(item_map.keys())]
+        all_items.sort(key=sort_key)
+        before_count, after_count = len(item_list), len(all_items)
+        item_list.clear()
+        item_list.extend(all_items)
+        if after_count != before_count:
+            logger.info(
+                f"Insert {len(new_items)} {key_name}, "
+                f"total {before_count} -> {after_count} ({after_count-before_count} added)"
+            )
 
 
-def save_campaignbonus(
-    all_campaigns: list[CampaignBonusData_], resp: FResponseData
-) -> list[CampaignBonusData_]:
-    def get_campaign_key(campaign: CampaignBonusData_):
-        return f"{campaign['eventId']}_{campaign['day']}_{campaign['name']}"
-
+def save_login_result(login_data: LoginResultData, resp: FResponseData) -> None:
     login_result = resp.get_response("login")
     if not login_result:
         logger.warning("no login result found")
-        return all_campaigns
-    cur_campaigns: list[CampaignBonusData_] = login_result.success.get(
-        "campaignbonus", []
-    )
+        return
 
-    if not cur_campaigns:
-        logger.info("no new campaign bonus")
-        return all_campaigns
-    campaign_dict: dict[str, CampaignBonusData_] = {
-        get_campaign_key(campaign): campaign for campaign in all_campaigns
-    }
-    before_count = len(campaign_dict)
-    for campaign in cur_campaigns or []:
-        campaign["updatedAt"] = resp.cache.serverTime
-        campaign_dict[get_campaign_key(campaign)] = campaign
-    campaigns = list(campaign_dict.values())
-    campaigns.sort(key=lambda x: (x.get("updatedAt", 0), x["eventId"], x["day"]))
-    after_count = len(campaign_dict)
-    logger.info(
-        f"Inserted {len(cur_campaigns)} campaigns, total {after_count} presents ({after_count-before_count} added)"
-    )
-    return campaigns
+    t0 = resp.cache.serverTime
+
+    def get_t(x: dict, t: int | None) -> int | str:
+        return x["updatedAt"] if t is None else t
+
+    fields: list[tuple[list[dict], str, Callable[[dict, int | None], str | int]]] = [
+        (login_data.loginMessages, "loginMessages", get_t),
+        (login_data.totalLoginBonus, "totalLoginBonus", get_t),
+        (
+            login_data.loginFortuneBonus,
+            "loginFortuneBonus",
+            lambda x, t: f"{x['eventId']}_{get_t(x,t)}",
+        ),
+        (
+            login_data.campaignbonus,
+            "campaignbonus",
+            lambda x, t: f"{x['eventId']}_{x['day']}_{x['name']}_{get_t(x,t)}",
+        ),
+        (login_data.campaignDirectBonus, "campaignDirectBonus", get_t),
+    ]
+
+    for item_list, key_name, key_getter in fields:
+        new_items: list[dict] = login_result.success.get(key_name, [])
+        item_map = {key_getter(x, None): x for x in item_list}
+        for item in new_items:
+            item = dict(item)
+            item["updatedAt"] = t0
+            if (
+                key_name == "totalLoginBonus"
+                and not item.get("items")
+                and not item.get("script")
+            ):
+                continue
+            item_map[key_getter(item, t0)] = item
+        all_items = [item_map[key] for key in sorted(item_map.keys())]
+        all_items.sort(key=lambda x: x["updatedAt"])
+        before_count, after_count = len(item_list), len(all_items)
+        item_list.clear()
+        item_list.extend(all_items)
+        if after_count != before_count:
+            logger.info(
+                f"Insert {len(new_items)} {key_name}, "
+                f"total {before_count} -> {after_count} ({after_count-before_count} added)"
+            )
 
 
 def replace_cache_value(cache: dict, mst: str, key: str, value):

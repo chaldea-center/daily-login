@@ -1,5 +1,6 @@
 from typing import Any
 
+from pydantic import BaseModel
 from typing_extensions import TypedDict
 
 from fgoapi.schemas.common import BaseModelExtra, Region
@@ -41,7 +42,16 @@ class UserPresentBoxEntityX(TypedDict):
     createdAt: int
 
 
-class AccountStatData(BaseModelExtra):
+class LoginResultData(BaseModel):
+    loginMessages: list[dict] = []
+    totalLoginBonus: list[dict] = []
+    # seqLoginBonus: list[dict]
+    loginFortuneBonus: list[dict] = []
+    campaignDirectBonus: list[dict] = []
+    campaignbonus: list[dict] = []
+
+
+class AccountStatData(BaseModel):
     info: AccountInfo
-    userPresentBox: list[dict]
-    campaignbonus: list[dict]
+    userPresentBox: list[dict] = []
+    loginResult: LoginResultData = LoginResultData()
