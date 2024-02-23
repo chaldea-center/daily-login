@@ -12,9 +12,9 @@ jobs:
       data_folder: "data/"
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Checkout data repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: chaldea-center/daily-login-data
           token: ${{ secrets.GH_PAGES_TOKEN }}
@@ -24,7 +24,7 @@ jobs:
         run: echo "${{ secrets.CONFIG_DATA }}" | base64 -d > config.json
 
       - name: Checkout fgoapi
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: chaldea-center/fgoapi
           path: fgoapi-repo
@@ -32,7 +32,7 @@ jobs:
       - run: mv fgoapi-repo/fgoapi fgoapi && rm -rf fgoapi-repo
 
       - name: Setup Python 3.11
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: "pip"
