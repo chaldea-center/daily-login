@@ -39,11 +39,14 @@ async def start_login(
             toplogin = await agent.login_top()
             assert toplogin.data
             seq_login_msg = post_process(toplogin.raw_resp.json(), file_saver)
-            await agent.home_top()
+            # await agent.home_top()
             return seq_login_msg
         except httpx.HTTPError as e:
             count += 1
             logger.exception("http error")
+            send_discord_msg(
+                f"[{user.auth.userId}]: login failed {count}/{max_retry}\n\n{e}"
+            )
             await sleep(60)
             continue
     raise Exception(f"Failed after max {max_retry} retries")
@@ -53,7 +56,7 @@ def post_process(src_data: dict, file_saver: "FileSaver") -> str:
     save_toplogin(src_data, file_saver.nid_fp("login_top"))
     try:
         resp = FResponseData.model_validate(src_data)
-        logger.info(src_data.get("response") or "no response found")
+        logger.info(dump_json(src_data.get("response")) or "no response found")
 
         stat_fp = Path(file_saver.stat_data())
         stat_data = AccountStatData.model_validate_json(stat_fp.read_bytes())
@@ -93,11 +96,10 @@ def save_user_entity(account_data: AccountStatData, resp: FResponseData) -> None
         before_count, after_count = len(item_list), len(all_items)
         item_list.clear()
         item_list.extend(all_items)
-        if after_count != before_count:
-            logger.info(
-                f"Insert {len(new_items)} {key_name}, "
-                f"total {before_count} -> {after_count} ({after_count-before_count} added)"
-            )
+        logger.info(
+            f"Insert {len(new_items)} {key_name}, "
+            f"total {before_count} -> {after_count} ({after_count-before_count} added)"
+        )
 
 
 def save_login_result(login_data: LoginResultData, resp: FResponseData) -> None:
@@ -145,7 +147,7 @@ def save_login_result(login_data: LoginResultData, resp: FResponseData) -> None:
         before_count, after_count = len(item_list), len(all_items)
         item_list.clear()
         item_list.extend(all_items)
-        if after_count != before_count:
+        if new_items:
             logger.info(
                 f"Insert {len(new_items)} {key_name}, "
                 f"total {before_count} -> {after_count} ({after_count-before_count} added)"
