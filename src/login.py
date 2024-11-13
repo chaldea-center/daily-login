@@ -122,8 +122,8 @@ def save_login_result(login_data: LoginResultData, resp: FResponseData) -> None:
             lambda x, t: f"{x['eventId']}_{get_t(x,t)}",
         ),
         (
-            login_data.campaignbonus,
-            "campaignbonus",
+            login_data.campaignBonus,
+            "campaignBonus",
             lambda x, t: f"{x['eventId']}_{x['day']}_{x['name']}_{get_t(x,t)}",
         ),
         (login_data.campaignDirectBonus, "campaignDirectBonus", get_t),
@@ -131,6 +131,8 @@ def save_login_result(login_data: LoginResultData, resp: FResponseData) -> None:
 
     for item_list, key_name, key_getter in fields:
         new_items: list[dict] = login_result.success.get(key_name, [])
+        if key_name == "campaignBonus":
+            new_items.extend(login_result.success.get("campaignbonus", []))
         item_map = {key_getter(x, None): x for x in item_list}
         for item in new_items:
             item = dict(item)

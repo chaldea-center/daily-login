@@ -1,6 +1,6 @@
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, root_validator
 from typing_extensions import TypedDict
 
 from fgoapi.schemas.common import BaseModelExtra, Region
@@ -48,7 +48,14 @@ class LoginResultData(BaseModel):
     # seqLoginBonus: list[dict]
     loginFortuneBonus: list[dict] = []
     campaignDirectBonus: list[dict] = []
-    campaignbonus: list[dict] = []
+    campaignBonus: list[dict] = []
+
+    @root_validator(pre=True)
+    def check_campaign_field(cls, values):
+        if 'campaignbonus' in values and 'campaignBonus' not in values:
+            values['campaignBonus'] = values['campaignbonus']
+            del values['campaignbonus']
+        return values
 
 
 class AccountStatData(BaseModel):
