@@ -53,10 +53,19 @@ async def start_login(
 
 
 def post_process(src_data: dict, file_saver: "FileSaver") -> str:
-    save_toplogin(src_data, file_saver.nid_fp("login_top"))
+    success = True
+    resp_text = dump_json(src_data.get("response")) or "no response found"
     try:
+        login_resp = next(
+            r
+            for r in src_data["response"]
+            if isinstance(r, dict) and r.get("nid") == "login"
+        )
+        if int(login_resp["resCode"]) != 0:
+            success = False
+            logger.error(f"login failed: {dump_json(src_data.get('response'))}")
         resp = FResponseData.model_validate(src_data)
-        logger.info(dump_json(src_data.get("response")) or "no response found")
+        logger.info(resp_text)
 
         stat_fp = Path(file_saver.stat_data())
         stat_data = AccountStatData.model_validate_json(stat_fp.read_bytes())
@@ -70,8 +79,16 @@ def post_process(src_data: dict, file_saver: "FileSaver") -> str:
         return f"{userLogin.seqLoginCount}/{userLogin.totalLoginCount}"
     except Exception as e:
         logger.exception("post process failed")
-        send_discord_msg(f"post process failed: {e}")
+        send_discord_msg(f"post process failed: {e}.\n{resp_text[:500]}")
         return "failed"
+    finally:
+        if success:
+            save_toplogin(src_data, file_saver.nid_fp("login_top"))
+        else:
+            from datetime import datetime
+
+            time_str = datetime.now().strftime("%Y%m%d_%H%M")
+            save_toplogin(src_data, file_saver.nid_fp("login_top", time_str))
 
 
 def save_user_entity(account_data: AccountStatData, resp: FResponseData) -> None:
@@ -218,8 +235,9 @@ class FileSaver:
         self.root = Path(data_folder).resolve() / f"{region}_{user_id}"
         self.stats = self.root / "_stats"
 
-    def nid_fp(self, nid: str):
-        return self.root / nid / f"{nid}.json"
+    def nid_fp(self, nid: str, fn: str | None = None):
+        fn = fn or nid
+        return self.root / nid / f"{fn}.json"
 
     def save_nid(self, nid: str, data: dict):
         fp = self.nid_fp(nid)
