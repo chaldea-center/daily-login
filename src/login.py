@@ -1,5 +1,6 @@
 from asyncio import sleep
 from pathlib import Path
+import time
 from typing import Callable, cast
 
 import httpx
@@ -11,7 +12,7 @@ from fgoapi.schemas.response import FResponseData
 
 from .logger import logger
 from .schemas.config import UserConfig
-from .schemas.data import AccountStatData, LoginResultData
+from .schemas.data import AccountInfo, AccountStatData, LoginResultData
 from .utils import dump_json, load_json, send_discord_msg
 
 
@@ -36,7 +37,7 @@ async def start_login(
     while count < max_retry:
         try:
             await agent.gamedata_top()
-            toplogin = await agent.login_top()
+            toplogin = await agent.login_top_with_fix()
             assert toplogin.data
             seq_login_msg = post_process(toplogin.raw_resp.json(), file_saver)
             # await agent.home_top()
@@ -63,12 +64,26 @@ def post_process(src_data: dict, file_saver: "FileSaver") -> str:
         )
         if int(login_resp["resCode"]) != 0:
             success = False
-            logger.error(f"login failed: {dump_json(src_data.get('response'))}")
+            logger.error(f"login failed: {resp_text}")
+            raise RuntimeError(f"login failed: {resp_text}")
         resp = FResponseData.model_validate(src_data)
         logger.info(resp_text)
 
         stat_fp = Path(file_saver.stat_data())
-        stat_data = AccountStatData.model_validate_json(stat_fp.read_bytes())
+        if not stat_fp.exists():
+            stat_data = AccountStatData(
+                info=AccountInfo(
+                    userId=0,
+                    friendCode="",
+                    region=Region.JP,
+                    name="",
+                    start=0,
+                    startSeqLoginCount=0,
+                    startTotalLoginCount=0,
+                )
+            )
+        else:
+            stat_data = AccountStatData.model_validate_json(stat_fp.read_bytes())
 
         save_user_entity(stat_data, resp)
         save_login_result(stat_data.loginResult, resp)
