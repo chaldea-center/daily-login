@@ -37,7 +37,7 @@ async def start_login(
     while count < max_retry:
         try:
             await agent.gamedata_top()
-            toplogin = await agent.login_top_with_fix()
+            toplogin = await agent.login_top()
             assert toplogin.data
             seq_login_msg = post_process(toplogin.raw_resp.json(), file_saver)
             # await agent.home_top()
