@@ -66,14 +66,8 @@ jobs:
               git commit -m "$(/bin/date -u "+%Y-%m-%d %H:%M")" || echo "Nothing to commit"
           fi
           git push
-
-  keepalive:
-    name: Keepalive
-    runs-on: ubuntu-latest
-    permissions:
-      actions: write
-    steps:
-      - uses: actions/checkout@v4
-      - uses: gautamkrishnar/keepalive-workflow@v2
-        with:
-          time_elapsed: 30
+      
+      - name: Keep alive
+        run: |
+          python scripts/keepalive.py
+          git push
