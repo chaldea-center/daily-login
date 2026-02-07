@@ -2,8 +2,8 @@ name: Daily Login
 on:
   workflow_dispatch:
   schedule:
-    # JST 10,22
-    - cron: "0 0,12 * * *"
+    # JST 8,21
+    - cron: "0 12,23 * * *"
 
 jobs:
   daily:
